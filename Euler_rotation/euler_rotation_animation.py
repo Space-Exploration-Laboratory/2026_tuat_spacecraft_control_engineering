@@ -19,6 +19,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Iterable
 
