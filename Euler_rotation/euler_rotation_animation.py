@@ -19,7 +19,6 @@ Examples:
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -153,6 +152,7 @@ def set_equal_3d_axes(ax, limit: float) -> None:
 
 
 
+
 def format_angle_for_filename(angle_deg: float) -> str:
     """Format an angle value for use in an output filename."""
     if np.isclose(angle_deg, round(angle_deg)):
@@ -162,9 +162,22 @@ def format_angle_for_filename(angle_deg: float) -> str:
     return text.replace("-", "m").replace(".", "p")
 
 
-def default_png_prefix(sequence: str, final_deg: np.ndarray) -> str:
-    angle_text = "_".join(format_angle_for_filename(v) for v in final_deg)
-    return f"{sequence}_{angle_text}"
+def format_euler_triplet_for_filename(angles_deg: np.ndarray) -> str:
+    """Format three Euler angle values as A1-A2-A3 for use in filenames."""
+    return "-".join(format_angle_for_filename(v) for v in angles_deg)
+
+
+def png_filenames(sequence: str, initial_deg: np.ndarray, final_deg: np.ndarray) -> tuple[str, str]:
+    """Return filenames for initial and rotated attitude snapshots.
+
+    Example:
+        sequence=ZXZ, initial=(0,0,0), final=(45,60,30)
+        -> ZXZ_0-0-0.png
+        -> ZXZ_0-0-0_45-60-30.png
+    """
+    initial_text = format_euler_triplet_for_filename(initial_deg)
+    final_text = format_euler_triplet_for_filename(final_deg)
+    return f"{sequence}_{initial_text}.png", f"{sequence}_{initial_text}_{final_text}.png"
 
 
 def draw_attitude_snapshot(
@@ -205,17 +218,15 @@ def draw_attitude_snapshot(
     plt.close(fig)
 
 
-def animate_euler_rotation(config: EulerAnimationConfig, save_path: str | None = None, png_dir: str = ".") -> None:
+def animate_euler_rotation(config: EulerAnimationConfig, save_path: str | None = None) -> None:
     sequence = config.sequence.upper()
     initial_rad = np.deg2rad(config.initial_deg)
     final_rad = np.deg2rad(config.final_deg)
     angle_path = make_one_axis_at_a_time_path(initial_rad, final_rad, config.frames_per_axis)
 
-    png_output_dir = Path(png_dir)
-    png_output_dir.mkdir(parents=True, exist_ok=True)
-    png_prefix = default_png_prefix(sequence, config.final_deg)
-    init_png = png_output_dir / f"{png_prefix}_init.png"
-    rotated_png = png_output_dir / f"{png_prefix}_rotated.png"
+    init_filename, rotated_filename = png_filenames(sequence, config.initial_deg, config.final_deg)
+    init_png = Path(init_filename)
+    rotated_png = Path(rotated_filename)
     draw_attitude_snapshot(
         sequence,
         config.initial_deg,
@@ -346,11 +357,6 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional output path, e.g. attitude.gif or attitude.mp4."
     )
-    parser.add_argument(
-        "--png-dir",
-        default=".",
-        help="Directory for static PNG outputs. Filenames are generated automatically, e.g. ZXZ_45_60_30_init.png."
-    )
     return parser.parse_args()
 
 
@@ -363,7 +369,7 @@ def main() -> None:
         frames_per_axis=args.frames_per_axis,
         interval_ms=args.interval,
     )
-    animate_euler_rotation(config, save_path=args.save, png_dir=args.png_dir)
+    animate_euler_rotation(config, save_path=args.save)
 
 
 if __name__ == "__main__":
